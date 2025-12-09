@@ -1,83 +1,374 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>ポケモン素早さ早見表</title>
 <style>
-body { font-family: sans-serif; margin:0; padding:0; background:white; }
-header { display:flex; align-items:center; justify-content:space-between; padding:10px; border-bottom:1px solid #ccc; }
-#menu { font-size:24px; cursor:pointer; }
-#search-box { width:90%; margin:10px auto; display:block; padding:10px; font-size:16px; }
-#scarf-toggle { position:fixed; top:10px; left:10px; }
-#result { margin:20px; }
-.speed-bar { height:20px; background:red; margin:5px 0; }
-.circle { width:14px; height:14px; border:2px solid red; border-radius:50%; display:inline-block; margin-left:5px; }
-footer { text-align:center; padding:20px; border-top:1px solid #ccc; margin-top:40px; }
+:root{
+  --bg:#ffffff;
+  --accent:#ff3b3b; /* red for normal */
+  --scarf-blue:#2b85ff;
+  --text:#111;
+  --muted:#666;
+  --max-width:1200px;
+  font-family: "Noto Sans JP", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);padding-bottom:60px}
+.app{max-width:var(--max-width);margin:0 auto;padding:12px}
+header{display:flex;align-items:center;gap:12px;padding:8px 0}
+#logo{font-weight:700;font-size:18px}
+.controls{display:flex;gap:8px;align-items:center;width:100%;position:relative}
+.search-wrap{flex:1;position:relative}
+#search-box{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:16px}
+.suggestions{position:absolute;left:0;right:0;background:#fff;border:1px solid #eee;border-top:none;max-height:220px;overflow:auto;z-index:30}
+.suggestions div{padding:8px 10px;cursor:pointer}
+.suggestions div:hover{background:#fafafa}
+#scarf-toggle{position:fixed;right:12px;top:12px;background:#fff;border:1px solid #eee;padding:8px 10px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,0.06);z-index:40}
+#scarf-toggle label{display:flex;align-items:center;gap:8px;cursor:pointer}
+#scarf{width:18px;height:18px}
+.main{display:flex;gap:12px;margin-top:12px}
+.left-column{width:160px}
+.left-column .axis-title{font-size:14px;color:var(--muted);margin-bottom:8px}
+.list-area{display:flex;flex-direction:column;gap:8px}
+.pokemon-card{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #eee;padding:8px;border-radius:8px}
+.poke-icon{width:48px;height:48px;border-radius:8px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-weight:700;color:#777}
+.poke-name{font-weight:700}
+.card-meta{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.remove-btn{background:transparent;border:1px solid #f0f0f0;padding:6px 8px;border-radius:6px;font-size:12px;color:var(--muted);cursor:pointer}
+.remove-btn:hover{background:#fafafa}
+.base-speed{font-size:13px;color:var(--muted)}
+.canvas-wrap{flex:1;min-height:320px;background:#fff;border:1px solid #eee;border-radius:8px;padding:12px;display:flex;flex-direction:column}
+.svg-area{flex:1;display:flex;align-items:stretch;justify-content:center;padding:6px;overflow:auto}
+.legend{display:flex;gap:12px;align-items:center;padding-top:8px;font-size:13px;color:var(--muted)}
+.legend .dot{width:14px;height:14px;border-radius:50%;display:inline-block}
+.marker-circle{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;width:44px;height:44px;border:3px solid var(--accent);font-weight:700;color:var(--text);background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.04);font-size:14px}
+.marker-circle.scarf{border-color:var(--scarf-blue)}
+.marker-small{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;border:2px solid var(--accent);color:var(--text);background:#fff}
+.marker-small.scarf{border-color:var(--scarf-blue)}
+/* layout for svg columns */
+.columns {display:flex;align-items:flex-end;gap:18px;height:100%;}
+.col {display:flex;flex-direction:column;align-items:center;gap:8px;width:120px;position:relative}
+.col .col-label{margin-top:8px;font-size:14px;font-weight:700}
+.col .col-meta{font-size:12px;color:var(--muted)}
+/* vertical axis labels on left */
+.axis {display:flex;flex-direction:column;justify-content:space-between;height:100%;padding-right:12px;align-items:flex-end;min-width:64px}
+.axis .tick{font-size:13px;color:var(--muted)}
+/* responsive */
+@media(max-width:700px){
+  .col{width:86px}
+  .marker-circle{width:36px;height:36px;font-size:13px}
+  .marker-small{width:18px;height:18px;font-size:11px}
+  .left-column{display:none}
+}
 </style>
 </head>
 <body>
-<header>
-<div id="logo">素早さ表</div>
-<div id="menu">☰</div>
-</header>
-
-<div id="scarf-toggle">
-<label><input type="checkbox" id="scarf"> スカーフ</label>
+<div id="scarf-toggle" title="スカーフを適用">
+  <label><input type="checkbox" id="scarf"> スカーフ</label>
 </div>
 
-<input type="text" id="search-box" placeholder="ポケモン名を検索">
+<div class="app">
+  <header>
+    <div id="logo">素早さ早見表</div>
+    <div style="flex:1"></div>
+  </header>
 
-<div id="result"></div>
+  <div class="controls">
+    <div class="search-wrap">
+      <input id="search-box" type="text" placeholder="ポケモン名を検索（例: ピカチュウ）" autocomplete="off" />
+      <div id="suggestions" class="suggestions" style="display:none"></div>
+    </div>
+    <div style="width:12px"></div>
+  </div>
 
-<footer>© Speed Chart</footer>
+  <div class="main">
+    <div class="left-column">
+      <div class="axis-title">縦軸: すばやさ</div>
+      <div class="list-area" id="list-area">
+        <!-- added pokemon cards appear here -->
+      </div>
+    </div>
+
+    <div class="canvas-wrap">
+      <div class="svg-area" id="svg-area">
+        <!-- svg graph will be injected here -->
+        <div style="width:100%;display:flex;align-items:center;justify-content:center;color:var(--muted)">
+          ポケモンを検索して追加してください
+        </div>
+      </div>
+      <div class="legend" id="legend">
+        <div><span class="dot" style="background:var(--accent)"></span> 実数値 (通常)</div>
+        <div><span class="dot" style="background:var(--scarf-blue)"></span> 実数値 (スカーフ)</div>
+      </div>
+    </div>
+  </div>
+
+  <footer style="text-align:center;padding:18px 0;color:var(--muted);font-size:13px">© Speed Chart</footer>
+</div>
 
 <script>
-// load CSV
-async function loadCSV() {
-    const res = await fetch("pokemon_speeds.csv");
+/*
+  実装済み機能（要望を反映）
+  - スカーフスイッチを右上に配置（ハンバーガーは削除）
+  - スイッチのオン/オフで即時再描画
+  - 実数値計算:
+      無振り = 種族値 + 20
+      準速   = 種族値 + 52
+      最速   = floor(準速 * 1.1)
+      スカーフ = floor(各値 * 1.5)
+  - 種族値はリスト（左）に表示（丸なし）
+  - グラフ上は数字のみを丸で囲む（最大3桁表示）
+  - スカーフ値は青丸、通常は赤丸
+  - 検索中にサジェスト表示
+  - ポケモン名の下にアイコン（プレースホルダ）表示（画像未提供のため）
+  - 複数表示対応（左から追加、各カードに削除ボタン）
+  - 縦軸は表示中の値の範囲に合わせて自動調整
+*/
+
+let DB = {};
+// load CSV (pokemon_speeds.csv expected in same folder)
+async function loadCSV(){
+  try {
+    const res = await fetch('pokemon_speeds.csv?_=' + Date.now());
+    if(!res.ok) throw new Error('no csv');
     const text = await res.text();
-    const lines = text.trim().split("\n").slice(1);
-    const map = {};
-    for (const line of lines) {
-        const [name, base] = line.split(",");
-        map[name] = parseInt(base);
-    }
-    return map;
-}
-
-function calcSpeeds(base) {
-    return {
-        no_ev: Math.floor((base*2+0)*1/2), 
-        neutral: Math.floor((base*2+63)*1/2),
-        max: Math.floor((base*2+127)*1/2)
-    };
-}
-
-loadCSV().then(db=>{
-    document.getElementById("search-box").addEventListener("input", e=>{
-        const name = e.target.value.trim();
-        if(!db[name]) { document.getElementById("result").innerHTML=""; return; }
-        const base = db[name];
-        const sp = calcSpeeds(base);
-        const scarf = document.getElementById("scarf").checked;
-
-        let html = `<h2>${name}</h2>`;
-        html += `<div>無振り: ${sp.no_ev} <span class="circle"></span></div>`;
-        html += `<div>準速: ${sp.neutral} <span class="circle"></span></div>`;
-        html += `<div>最速: ${sp.max} <span class="circle"></span></div>`;
-
-        if (scarf) {
-            html += `<div>無振り(スカーフ): ${Math.floor(sp.no_ev*1.5)}</div>`;
-            html += `<div>準速(スカーフ): ${Math.floor(sp.neutral*1.5)}</div>`;
-            html += `<div>最速(スカーフ): ${Math.floor(sp.max*1.5)}</div>`;
-        }
-
-        document.getElementById("result").innerHTML = html;
+    const lines = text.trim().split('\n').filter(Boolean);
+    const header = lines.shift();
+    lines.forEach(line=>{
+      // allow CSV with commas inside quotes by simple split on first comma
+      const idx = line.indexOf(',');
+      if(idx === -1) return;
+      const name = line.slice(0, idx).trim();
+      const baseStr = line.slice(idx+1).trim();
+      const base = parseInt(baseStr);
+      if(name && !Number.isNaN(base)) DB[name] = base;
     });
+  } catch(e){
+    // fallback small DB if csv not found
+    DB = { 'ピカチュウ':90, 'ガブリアス':102, 'カイリュー':80 };
+  }
+}
+function calcValues(base){
+  const no_ev = Math.floor(base + 20);
+  const neutral = Math.floor(base + 52);
+  const max = Math.floor(neutral * 1.1);
+  const scarf = v=> Math.floor(v * 1.5);
+  return {
+    base: base,
+    no_ev, neutral, max,
+    no_ev_scarf: scarf(no_ev),
+    neutral_scarf: scarf(neutral),
+    max_scarf: scarf(max)
+  };
+}
+
+const searchBox = document.getElementById('search-box');
+const suggestionsEl = document.getElementById('suggestions');
+const listArea = document.getElementById('list-area');
+const svgArea = document.getElementById('svg-area');
+const scarfCheckbox = document.getElementById('scarf');
+
+let displayed = []; // array of {name, base, values, id}
+
+function renderSuggestions(q){
+  const ql = q.trim();
+  if(!ql){ suggestionsEl.style.display='none'; return; }
+  const keys = Object.keys(DB);
+  const matches = keys.filter(n=> n.includes(ql)).slice(0,20);
+  if(matches.length===0){ suggestionsEl.style.display='none'; return; }
+  suggestionsEl.innerHTML = matches.map(m=> `<div data-name="${m}">${m}</div>`).join('');
+  suggestionsEl.style.display='block';
+  // click handlers
+  suggestionsEl.querySelectorAll('div').forEach(d=>{
+    d.onclick = ()=> {
+      addPokemon(d.dataset.name);
+      searchBox.value = '';
+      suggestionsEl.style.display='none';
+      searchBox.focus();
+    }
+  });
+}
+
+// add pokemon to displayed list (left to right)
+function addPokemon(name){
+  if(!DB[name]) return;
+  // prevent duplicates
+  if(displayed.find(p=>p.name===name)) return;
+  const base = DB[name];
+  const values = calcValues(base);
+  const id = 'p' + Date.now() + Math.floor(Math.random()*1000);
+  displayed.push({id,name,base,values});
+  renderList();
+  renderGraph();
+}
+
+function removePokemon(id){
+  displayed = displayed.filter(p=>p.id !== id);
+  renderList();
+  renderGraph();
+}
+
+function renderList(){
+  listArea.innerHTML = '';
+  displayed.forEach(p=>{
+    const div = document.createElement('div');
+    div.className = 'pokemon-card';
+    div.innerHTML = `
+      <div class="poke-icon" aria-hidden="true">⚪</div>
+      <div>
+        <div class="poke-name">${p.name}</div>
+        <div class="base-speed">種族値: ${p.base}</div>
+      </div>
+      <div class="card-meta">
+        <button class="remove-btn" data-id="${p.id}">削除</button>
+      </div>
+    `;
+    listArea.appendChild(div);
+  });
+  // attach remove handlers
+  listArea.querySelectorAll('.remove-btn').forEach(btn=>{
+    btn.onclick = ()=> removePokemon(btn.dataset.id);
+  });
+}
+
+// render graph as SVG
+function renderGraph(){
+  if(displayed.length===0){
+    svgArea.innerHTML = '<div style="width:100%;display:flex;align-items:center;justify-content:center;color:var(--muted)">ポケモンを検索して追加してください</div>';
+    return;
+  }
+  // gather values to determine axis range
+  const allVals = [];
+  displayed.forEach(p=>{
+    allVals.push(p.values.no_ev, p.values.neutral, p.values.max);
+    if(scarfCheckbox.checked) allVals.push(p.values.no_ev_scarf, p.values.neutral_scarf, p.values.max_scarf);
+  });
+  const vMin = Math.max(0, Math.min(...allVals) - 10);
+  const vMax = Math.max(...allVals) + 10;
+  const height = 320;
+  const width = Math.max(420, displayed.length * 140 + 80);
+  const axisTicks = 5;
+  // create axis labels (descending from top)
+  const ticks = [];
+  for(let i=0;i<=axisTicks;i++){
+    const val = Math.round(vMin + (vMax - vMin) * ( (axisTicks - i) / axisTicks ));
+    ticks.push(val);
+  }
+  // build columns
+  let colsHtml = '';
+  displayed.forEach((p, idx)=>{
+    const colX = 60 + idx * 140;
+    // compute y positions (svg coordinates: y increases downward)
+    const toY = (val) => {
+      const ratio = (val - vMin) / (vMax - vMin);
+      return Math.round((1 - ratio) * (height - 40)) + 20;
+    };
+    const vals = p.values;
+    const y_no = toY(vals.no_ev);
+    const y_n = toY(vals.neutral);
+    const y_m = toY(vals.max);
+    // scarf positions
+    const y_no_s = toY(vals.no_ev_scarf);
+    const y_n_s = toY(vals.neutral_scarf);
+    const y_m_s = toY(vals.max_scarf);
+    // vertical connector between min and max (light)
+    const connector = `<line x1="${colX}" y1="${y_no}" x2="${colX}" y2="${y_m}" stroke="#f2f2f2" stroke-width="6" stroke-linecap="round"></line>`;
+    // normal circles (red border)
+    const normalCircles = `
+      <g>
+        <circle cx="${colX}" cy="${y_no}" r="22" fill="#fff" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#ff3b3b'}" stroke-width="3"></circle>
+        <text x="${colX}" y="${y_no+6}" font-size="14" font-weight="700" text-anchor="middle">${formatNumberForCircle(vals.no_ev)}</text>
+
+        <circle cx="${colX}" cy="${y_n}" r="22" fill="#fff" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#ff3b3b'}" stroke-width="3"></circle>
+        <text x="${colX}" y="${y_n+6}" font-size="14" font-weight="700" text-anchor="middle">${formatNumberForCircle(vals.neutral)}</text>
+
+        <circle cx="${colX}" cy="${y_m}" r="22" fill="#fff" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#ff3b3b'}" stroke-width="3"></circle>
+        <text x="${colX}" y="${y_m+6}" font-size="14" font-weight="700" text-anchor="middle">${formatNumberForCircle(vals.max)}</text>
+      </g>
+    `;
+    // scarf circles (blue border) - slightly offset to the right so both visible
+    const scarfCircles = scarfCheckbox.checked ? `
+      <g>
+        <circle cx="${colX+36}" cy="${y_no_s}" r="14" fill="#fff" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--scarf-blue') || '#2b85ff'}" stroke-width="3"></circle>
+        <text x="${colX+36}" y="${y_no_s+5}" font-size="11" font-weight="700" text-anchor="middle" fill="#000">${formatNumberForCircle(vals.no_ev_scarf)}</text>
+
+        <circle cx="${colX+36}" cy="${y_n_s}" r="14" fill="#fff" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--scarf-blue') || '#2b85ff'}" stroke-width="3"></circle>
+        <text x="${colX+36}" y="${y_n_s+5}" font-size="11" font-weight="700" text-anchor="middle" fill="#000">${formatNumberForCircle(vals.neutral_scarf)}</text>
+
+        <circle cx="${colX+36}" cy="${y_m_s}" r="14" fill="#fff" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--scarf-blue') || '#2b85ff'}" stroke-width="3"></circle>
+        <text x="${colX+36}" y="${y_m_s+5}" font-size="11" font-weight="700" text-anchor="middle" fill="#000">${formatNumberForCircle(vals.max_scarf)}</text>
+      </g>
+    ` : '';
+    // label and icon below
+    const label = `
+      <g>
+        <rect x="${colX-40}" y="${height+8}" width="80" height="36" rx="8" fill="#fff" stroke="#f3f3f3"></rect>
+        <text x="${colX}" y="${height+32}" font-size="12" text-anchor="middle" fill="#111" font-weight="700">${p.name}</text>
+      </g>
+    `;
+    colsHtml += connector + normalCircles + scarfCircles + label;
+  });
+
+  // axis svg
+  const svg = `
+    <svg width="${width}" height="${height + 60}" viewBox="0 0 ${width} ${height + 60}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="素早さグラフ">
+      <style>
+        text{font-family: "Noto Sans JP", sans-serif}
+      </style>
+      <!-- axis ticks -->
+      <g transform="translate(40,0)">
+        ${ticks.map((t,i)=> {
+          const y = Math.round((height - 40) * (i/ (ticks.length-1))) + 20;
+          return `<text x="-12" y="${y+5}" text-anchor="end" class="tick" fill="${getComputedStyle(document.documentElement).getPropertyValue('--muted') || '#666'}">${t}</text>
+                  <line x1="0" y1="${y}" x2="${width-80}" y2="${y}" stroke="#f5f5f5" stroke-width="1" />`;
+        }).join('')}
+      </g>
+
+      <!-- columns -->
+      <g transform="translate(0,0)">
+        ${colsHtml}
+      </g>
+    </svg>
+  `;
+  svgArea.innerHTML = svg;
+}
+
+// helper: format number for circle (max 3 digits)
+function formatNumberForCircle(n){
+  const v = Math.floor(n);
+  if(v > 999) return String(v).slice(0,3);
+  return String(v);
+}
+
+// events
+searchBox.addEventListener('input', (e)=> {
+  renderSuggestions(e.target.value);
+});
+searchBox.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){
+    const val = e.target.value.trim();
+    if(val && DB[val]){ addPokemon(val); e.target.value=''; suggestionsEl.style.display='none'; }
+  } else if(e.key === 'Escape'){
+    suggestionsEl.style.display='none';
+  }
+});
+document.addEventListener('click', (e)=>{
+  if(!document.querySelector('.search-wrap').contains(e.target)){
+    suggestionsEl.style.display='none';
+  }
+});
+
+// immediately re-render when scarf toggled
+scarfCheckbox.addEventListener('change', ()=>{
+  renderGraph();
+});
+
+// init
+loadCSV().then(()=> {
+  // ready
 });
 </script>
-
 </body>
 </html>

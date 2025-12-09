@@ -129,26 +129,38 @@ header{display:flex;align-items:center;gap:12px;padding:8px 0}
 
 let DB = {};
 // load CSV (pokemon_speeds.csv expected in same folder)
-async function loadCSV(){
-  try {
-    const res = await fetch('pokemon_speeds.csv?_=' + Date.now());
-    if(!res.ok) throw new Error('no csv');
+// CSV 読み込み（図鑑No / 名前（日本語） / フォルム名（日本語） / ... / 素早さ）
+async function loadCSV() {
+    const res = await fetch("ポケモンリスト.csv");
     const text = await res.text();
-    const lines = text.trim().split('\n').filter(Boolean);
-    const header = lines.shift();
-    lines.forEach(line=>{
-      // allow CSV with commas inside quotes by simple split on first comma
-      const idx = line.indexOf(',');
-      if(idx === -1) return;
-      const name = line.slice(0, idx).trim();
-      const baseStr = line.slice(idx+1).trim();
-      const base = parseInt(baseStr);
-      if(name && !Number.isNaN(base)) DB[name] = base;
-    });
-  } catch(e){
-    // fallback small DB if csv not found
-    DB = { 'ピカチュウ':90, 'ガブリアス':102, 'カイリュー':80 };
-  }
+    const lines = text.trim().split("\n");
+
+    // ヘッダー行
+    const header = lines.shift().split(",");
+
+    // ヘッダーの列位置を特定
+    const idxName = header.indexOf("名前（日本語）");
+    const idxForm = header.indexOf("フォルム名（日本語）");
+    const idxSpeed = header.indexOf("素早さ");
+
+    const db = {};
+
+    for (const line of lines) {
+        const cols = line.split(",");
+
+        const name = cols[idxName].trim();
+        const form = cols[idxForm].trim();
+        const speed = parseInt(cols[idxSpeed]);
+
+        // 表示名（通常 → そのまま）
+        const displayName = (form === "通常" || form === "" || form === "-")
+            ? name
+            : `${name}（${form}）`;
+
+        db[displayName] = speed;
+    }
+
+    return db;
 }
 function calcValues(base){
   const no_ev = Math.floor(base + 20);

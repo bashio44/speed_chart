@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ポケモン素早さ早見表（修正版）</title>
+<title>ポケモン素早さ早見表（修正版 v2）</title>
 <style>
 :root{
   --bg:#ffffff;
@@ -15,7 +15,7 @@
   --max-width:1200px;
   font-family: "Noto Sans JP", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
   --col-width:70px; /* 狭め */
-  --col-gap:6px;    /* かなり詰める（青丸オフセットを考慮） */
+  --col-gap:6px;    /* かなり詰める */
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -49,15 +49,15 @@ header{display:flex;align-items:center;gap:12px;padding:8px 0}
 .base-speed{font-size:12px;color:var(--muted)}
 
 /* canvas */
-.canvas-wrap{flex:1;min-height:460px;background:#fff;border:1px solid #eee;border-radius:8px;padding:12px;display:flex;flex-direction:column}
-.svg-area{flex:1;display:flex;align-items:stretch;justify-content:center;padding:6px;overflow:auto}
+.canvas-wrap{flex:1;min-height:460px;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;display:flex;flex-direction:column}
+.svg-area{flex:1;display:flex;align-items:stretch;justify-content:center;padding:0;overflow:auto} /* padding 0 to use full area */
 .legend{display:flex;gap:12px;align-items:center;padding-top:8px;font-size:13px;color:var(--muted)}
 .legend .dot{width:14px;height:14px;border-radius:50%;display:inline-block}
 
 /* settings tab */
 .settings-wrap{flex:1;min-height:460px;background:#fff;border:1px solid #eee;border-radius:8px;padding:12px;display:flex;flex-direction:column}
 .settings-list{display:flex;flex-direction:column;gap:8px;padding:8px 0;max-height:520px;overflow:auto}
-.setting-card{display:flex;align-items:center;gap:12px;padding:8px;border:1px solid #eee;border-radius:8px;background:#fff}
+.setting-card{display:flex;align-items:flex-start;gap:12px;padding:8px;border:1px solid #eee;border-radius:8px;background:#fff;flex-wrap:wrap}
 .setting-left{display:flex;align-items:center;gap:8px;width:120px}
 .setting-name-vertical{font-weight:700;line-height:1;display:flex;flex-direction:column;align-items:center;gap:0;padding:0 2px}
 .switch{position:relative;width:44px;height:24px;background:#e6e6e6;border-radius:999px;cursor:pointer}
@@ -65,11 +65,14 @@ header{display:flex;align-items:center;gap:12px;padding:8px 0}
 .switch.on{background:var(--accent)}
 .switch.on .knob{left:23px}
 .counter{display:flex;align-items:center;gap:6px}
-.counter button{width:28px;height:28px;border-radius:6px;border:1px solid #eee;background:#fff;cursor:pointer}
-.counter .value{min-width:28px;text-align:center;font-weight:700}
+.counter button{width:32px;height:32px;border-radius:6px;border:1px solid #eee;background:#fff;cursor:pointer}
+.counter .value{min-width:36px;text-align:center;font-weight:700}
 
-/* hide the right-side name/value in settings (user requested) - nothing to style */
+/* top row toggles */
+.toggle-row{display:flex;gap:18px;align-items:center;width:100%;margin-bottom:8px;}
+.counter-row{display:flex;gap:18px;align-items:center;width:100%}
 
+/* responsive */
 @media(max-width:900px){
   .left-column{display:none}
   .main{flex-direction:column}
@@ -135,20 +138,16 @@ header{display:flex;align-items:center;gap:12px;padding:8px 0}
 </div>
 
 <script>
-/*
-  修正版 index.html
-  - CSV は name,base,dex のヘッダ（または同列順）を想定
-  - dex はポケモン徹底攻略の図鑑画像取得に使用
-  - 「全体」設定の実装（常に先頭に表示）
-  - 新規追加は全体設定を継承
-  - 赤・青丸のサイズを統一（r=14）
-  - 列幅を狭め、グラフ上下余白を削減
+/* 修正版 v2
+ - ✖️の位置をラベルの上に移動
+ - SVGの左右上余白を縮め、枠いっぱいに表示
+ - 設定のレイアウトを上段:スカーフ/まひ 下段:能力変化 に変更
+ - グローバル（全体）設定を即時反映・新規追加は継承
+ - アイコンはCSVのdexを参照（zukan URL）
 */
 
-let DB = {}; // name => { base: number, dex: string|null }
-let globalSettings = { scarf:false, para:false, boost:0 }; // "全体" の設定
-
-// displayed: array of { id, name, base, dex, values:{no_ev,neutral,max}, settings:{scarf,para,boost} }
+let DB = {};
+let globalSettings = { scarf:false, para:false, boost:0 };
 let displayed = [];
 
 const searchBox = document.getElementById('search-box');
@@ -168,20 +167,17 @@ async function loadCSV(){
     const text = await res.text();
     const lines = text.trim().split('\n').filter(Boolean);
     if(lines.length === 0) throw new Error('empty csv');
-    // check header to detect columns
     const header = lines[0].split(',').map(h=>h.trim().toLowerCase());
     let nameIdx=0, baseIdx=1, dexIdx=2;
-    if(header[0].match(/[a-z\u30a1-\u30f4]/i) && header.some(h=>h.includes('name')||h.includes('名前'))){
-      // header present: detect cols
+    if(header.some(h=>h.includes('name')||h.includes('名前'))){
       for(let i=0;i<header.length;i++){
         const h = header[i];
         if(h.includes('name') || h.includes('名前')) nameIdx=i;
         if(h.includes('base') || h.includes('種族値')) baseIdx=i;
         if(h.includes('dex') || h.includes('図鑑') || h.includes('番号') || h.includes('no')) dexIdx=i;
       }
-      lines.shift(); // remove header
+      lines.shift();
     } else {
-      // assume order name,base,dex
       nameIdx=0;baseIdx=1;dexIdx=2;
     }
     lines.forEach(line=>{
@@ -194,7 +190,6 @@ async function loadCSV(){
       }
     });
   } catch(e){
-    // fallback minimal DB (with dex where possible)
     DB = {
       'ピカチュウ':{base:90, dex:'025'},
       'ガブリアス':{base:102, dex:'445'},
@@ -203,26 +198,24 @@ async function loadCSV(){
     };
   }
 }
-
-// csv line parser that handles quoted commas simply
 function parseCSVLine(line){
-  const res=[];
-  let cur=''; let inQ=false;
+  const res=[]; let cur=''; let inQ=false;
   for(let i=0;i<line.length;i++){
-    const ch = line[i];
-    if(ch === '"' ){ inQ = !inQ; continue; }
+    const ch=line[i];
+    if(ch === '"'){ inQ=!inQ; continue;}
     if(ch === ',' && !inQ){ res.push(cur); cur=''; continue; }
     cur += ch;
   }
-  res.push(cur);
-  return res;
+  res.push(cur); return res;
 }
-
 function calcValues(base){
-  const no_ev = Math.floor(base + 20);
-  const neutral = Math.floor(base + 52);
-  const max = Math.floor(neutral * 1.1);
-  return { no_ev, neutral, max };
+  return { no_ev: Math.floor(base + 20), neutral: Math.floor(base + 52), max: Math.floor((base + 52) * 1.1) };
+}
+function iconUrlFromDex(dex){
+  const n = String(dex).replace(/^0+/, '') || dex;
+  let pad = n;
+  if(/^\d+$/.test(n)) pad = n.padStart(3,'0');
+  return `https://zukan.pokemon.co.jp/zukan-api/up/images/index/${pad}_m.png`;
 }
 
 function renderSuggestions(q){
@@ -247,11 +240,10 @@ function addPokemon(name){
   if(!DB[name]) return;
   if(displayed.find(p=>p.name===name)) return;
   const entry = DB[name];
-  const base = entry.base;
-  const dex = entry.dex || null;
+  const base = entry.base; const dex = entry.dex || null;
   const values = calcValues(base);
   const id = 'p' + Date.now() + Math.floor(Math.random()*1000);
-  // inherit globalSettings
+  // inherit global settings
   const s = { scarf: globalSettings.scarf, para: globalSettings.para, boost: globalSettings.boost };
   displayed.push({ id, name, base, dex, values, settings: s });
   renderList();
@@ -301,60 +293,67 @@ function renderList(){
   });
 }
 
-// settings UI, includes "全体" card at top
 function renderSettings(){
   settingsList.innerHTML = '';
-  // 全体カード (always present)
+  // 全体カード
   const allCard = document.createElement('div');
   allCard.className = 'setting-card';
   allCard.innerHTML = `
     <div class="setting-left">
-      <div class="poke-icon"><!-- empty: 全体アイコンなし --></div>
-      <div style="font-weight:700; padding-left:6px">全体</div>
+      <div class="poke-icon"></div>
+      <div class="setting-name-vertical"><span>全</span><span>体</span></div>
     </div>
-    <div style="flex:1;display:flex;align-items:center;gap:18px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <div style="font-size:13px;color:var(--muted);margin-right:6px">スカーフ</div>
-        <div class="switch ${globalSettings.scarf ? 'on' : ''}" data-key="global-scarf"><div class="knob"></div></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div style="font-size:13px;color:var(--muted);margin-right:6px">まひ</div>
-        <div class="switch ${globalSettings.para ? 'on' : ''}" data-key="global-para"><div class="knob"></div></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div style="font-size:13px;color:var(--muted);margin-right:8px">能力変化</div>
-        <div class="counter" data-key="global-boost">
-          <button class="dec" data-key="global-dec">−</button>
-          <div class="value" data-key="global-val">${globalSettings.boost}</div>
-          <button class="inc" data-key="global-inc">＋</button>
+    <div style="flex:1">
+      <div class="toggle-row">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:13px;color:var(--muted);">スカーフ</div>
+          <div class="switch ${globalSettings.scarf ? 'on' : ''}" data-key="global-scarf"><div class="knob"></div></div>
         </div>
-        <div style="color:var(--muted);font-size:12px;margin-left:8px">（-6〜+6）</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:13px;color:var(--muted);">まひ</div>
+          <div class="switch ${globalSettings.para ? 'on' : ''}" data-key="global-para"><div class="knob"></div></div>
+        </div>
+      </div>
+      <div class="counter-row">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:13px;color:var(--muted);margin-right:8px">能力変化</div>
+          <div class="counter" data-key="global-boost">
+            <button class="dec" data-key="global-dec">−</button>
+            <div class="value" data-key="global-val">${globalSettings.boost}</div>
+            <button class="inc" data-key="global-inc">＋</button>
+          </div>
+          <div style="color:var(--muted);font-size:12px;margin-left:8px">（-6〜+6）</div>
+        </div>
       </div>
     </div>
   `;
   settingsList.appendChild(allCard);
 
-  // bind handlers for global
-  allCard.querySelector('[data-key="global-scarf"]').onclick = ()=>{
+  // bind global handlers
+  const gScarf = allCard.querySelector('[data-key="global-scarf"]');
+  const gPara = allCard.querySelector('[data-key="global-para"]');
+  const gDec = allCard.querySelector('[data-key="global-dec"]');
+  const gInc = allCard.querySelector('[data-key="global-inc"]');
+
+  if(gScarf) gScarf.onclick = ()=>{
     globalSettings.scarf = !globalSettings.scarf;
-    // apply to all existing pokemons (overwrite)
     displayed.forEach(p=> p.settings.scarf = globalSettings.scarf);
     renderSettings();
     renderGraph();
   };
-  allCard.querySelector('[data-key="global-para"]').onclick = ()=>{
+  if(gPara) gPara.onclick = ()=>{
     globalSettings.para = !globalSettings.para;
     displayed.forEach(p=> p.settings.para = globalSettings.para);
     renderSettings();
     renderGraph();
   };
-  allCard.querySelector('[data-key="global-dec"]').onclick = ()=>{
+  if(gDec) gDec.onclick = ()=>{
     if(globalSettings.boost > -6) globalSettings.boost--;
     displayed.forEach(p=> p.settings.boost = globalSettings.boost);
     renderSettings();
     renderGraph();
   };
-  allCard.querySelector('[data-key="global-inc"]').onclick = ()=>{
+  if(gInc) gInc.onclick = ()=>{
     if(globalSettings.boost < 6) globalSettings.boost++;
     displayed.forEach(p=> p.settings.boost = globalSettings.boost);
     renderSettings();
@@ -381,21 +380,26 @@ function renderSettings(){
         ${iconHtml}
         <div class="setting-name-vertical">${chars}</div>
       </div>
-      <div style="flex:1;display:flex;align-items:center;gap:18px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="font-size:13px;color:var(--muted);margin-right:6px">スカーフ</div>
-          <div class="switch ${p.settings.scarf ? 'on' : ''}" data-id="${p.id}" data-key="scarf"><div class="knob"></div></div>
+      <div style="flex:1">
+        <div class="toggle-row">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-size:13px;color:var(--muted);">スカーフ</div>
+            <div class="switch ${p.settings.scarf ? 'on' : ''}" data-id="${p.id}" data-key="scarf"><div class="knob"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-size:13px;color:var(--muted);">まひ</div>
+            <div class="switch ${p.settings.para ? 'on' : ''}" data-id="${p.id}" data-key="para"><div class="knob"></div></div>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="font-size:13px;color:var(--muted);margin-right:6px">まひ</div>
-          <div class="switch ${p.settings.para ? 'on' : ''}" data-id="${p.id}" data-key="para"><div class="knob"></div></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="font-size:13px;color:var(--muted);margin-right:8px">能力変化</div>
-          <div class="counter" data-id="${p.id}">
-            <button class="dec" data-id="${p.id}">−</button>
-            <div class="value" data-id="${p.id}">${p.settings.boost}</div>
-            <button class="inc" data-id="${p.id}">＋</button>
+        <div class="counter-row">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-size:13px;color:var(--muted);margin-right:8px">能力変化</div>
+            <div class="counter" data-id="${p.id}">
+              <button class="dec" data-id="${p.id}">−</button>
+              <div class="value" data-id="${p.id}">${p.settings.boost}</div>
+              <button class="inc" data-id="${p.id}">＋</button>
+            </div>
+            <div style="color:var(--muted);font-size:12px;margin-left:8px">（-6〜+6）</div>
           </div>
         </div>
       </div>
@@ -446,29 +450,12 @@ function renderSettings(){
   });
 }
 
-// icon URL builder using 図鑑番号 (dex)
-// We expect dex to be zero-padded or number string; ensure 3-digit left pad if necessary (many sites use padded numbers)
-function iconUrlFromDex(dex){
-  // if dex is numeric string: pad to 3
-  const n = String(dex).replace(/^0+/, '') || dex;
-  let pad = n;
-  // if numeric and less than 1000
-  if(/^\d+$/.test(n)){
-    pad = n.padStart(3,'0');
-  }
-  // Using the URL pattern suggested earlier:
-  return `https://zukan.pokemon.co.jp/zukan-api/up/images/index/${pad}_m.png`;
-}
-
-// ability multiplier calculation
 function abilityMultiplier(boost){
   if(boost === 0) return 1.0;
   if(boost > 0) return (2 + boost) / 2;
   const k = Math.abs(boost);
   return 2 / (2 + k);
 }
-
-// formatting for numbers inside circles
 function fmt(n){
   const v = Math.floor(n);
   if(v > 999) return String(v).slice(0,3);
@@ -481,14 +468,13 @@ function renderGraph(){
     return;
   }
 
-  // gather values (including changed ones) to set axis
+  // gather values
   const allVals = [];
   displayed.forEach(p=>{
     const v = p.values;
     allVals.push(v.no_ev, v.neutral, v.max);
     const s = p.settings;
-    const hasChange = s.scarf || s.para || s.boost !== 0;
-    if(hasChange){
+    if(s.scarf || s.para || s.boost !== 0){
       const m = (s.scarf ? 1.5 : 1.0) * (s.para ? 0.5 : 1.0) * abilityMultiplier(s.boost);
       allVals.push(Math.floor(v.no_ev * m), Math.floor(v.neutral * m), Math.floor(v.max * m));
     }
@@ -496,16 +482,14 @@ function renderGraph(){
 
   const vMin = Math.max(0, Math.min(...allVals));
   const vMax = Math.max(...allVals);
-
-  // reduce top/bottom slack to minimum
-  const pad = Math.max(4, Math.round((vMax - vMin) * 0.03)); // small percentage padding
+  const pad = Math.max(4, Math.round((vMax - vMin) * 0.03));
   const axisMin = Math.max(0, vMin - pad);
   const axisMax = vMax + pad;
 
-  const height = 520; // tall per request
+  const height = 520;
   const colW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--col-width')) || 70;
   const gap = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--col-gap')) || 6;
-  const blueOffset = 30; // as decided
+  const blueOffset = 30;
   const width = Math.max(420, displayed.length * (colW + gap) + 160);
   const axisTicks = 6;
 
@@ -517,35 +501,26 @@ function renderGraph(){
 
   const toY = (val) => {
     const ratio = (val - axisMin) / (axisMax - axisMin);
-    // tighten top/bottom margins: map [0,1] -> [12, height-40]
     return Math.round((1 - ratio) * (height - 52)) + 12;
   };
 
-  // build column svg parts
+  // build columns
   let cols = '';
   displayed.forEach((p, idx)=>{
-    const colX = 80 + idx * (colW + gap);
+    const colX = 60 + idx * (colW + gap); // reduced left margin to 60
     const vals = p.values;
     const y_no = toY(vals.no_ev);
     const y_n = toY(vals.neutral);
     const y_m = toY(vals.max);
 
     const s = p.settings;
-    const hasChange = s.scarf || s.para || s.boost !== 0;
     let changed = null;
-    if(hasChange){
+    if(s.scarf || s.para || s.boost !== 0){
       const m = (s.scarf ? 1.5 : 1.0) * (s.para ? 0.5 : 1.0) * abilityMultiplier(s.boost);
-      changed = {
-        no: Math.floor(vals.no_ev * m),
-        neutral: Math.floor(vals.neutral * m),
-        max: Math.floor(vals.max * m)
-      };
+      changed = { no: Math.floor(vals.no_ev * m), neutral: Math.floor(vals.neutral * m), max: Math.floor(vals.max * m) };
     }
 
-    // connector
     const connector = `<line x1="${colX}" y1="${y_no}" x2="${colX}" y2="${y_m}" stroke="#f2f2f2" stroke-width="6" stroke-linecap="round"></line>`;
-
-    // circles: both red and blue use r=14, text small unified
     const rBig = 14;
     const normal = `
       <g>
@@ -580,14 +555,13 @@ function renderGraph(){
       `;
     }
 
-    // vertical name below column using tspan (each char in its own tspan)
+    // vertical name below column
     const nameTspan = Array.from(p.name).map((c,i)=>`<tspan class="col-label-tspan" x="${colX}" dy="${i===0?0:14}">${c}</tspan>`).join('');
+    const labelY = height + 20;
 
-    // label Y position
-    const labelY = height + 18;
-
-    // delete button group
-    const deleteBtnId = 'del-' + p.id;
+    // position delete button above label (avoid overlap)
+    const delY = labelY - 44; // move up so it's above name
+    const delId = 'del-' + p.id;
     const label = `
       <g>
         <text x="${colX}" y="${labelY}" font-size="12" text-anchor="middle" fill="#111" font-weight="700">
@@ -596,21 +570,22 @@ function renderGraph(){
       </g>
     `;
     cols += connector + normal + changedHtml + label + `
-      <g id="${deleteBtnId}" cursor="pointer">
-        <rect x="${colX-22}" y="${labelY+8}" width="44" height="28" rx="6" fill="#fff" stroke="#f3f3f3"></rect>
-        <text x="${colX}" y="${labelY+27}" font-size="14" text-anchor="middle" fill="#111">✖️</text>
+      <g id="${delId}" cursor="pointer">
+        <rect x="${colX-18}" y="${delY}" width="36" height="28" rx="6" fill="#fff" stroke="#f3f3f3"></rect>
+        <text x="${colX}" y="${delY+19}" font-size="14" text-anchor="middle" fill="#111">✖️</text>
       </g>
     `;
   });
 
+  // tighter left translate (use more of the box), and tick line length adjusted
   const svg = `
-    <svg width="${width}" height="${height + 120}" viewBox="0 0 ${width} ${height + 120}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="素早さグラフ">
+    <svg width="100%" height="${height + 120}" viewBox="0 0 ${Math.max(420, displayed.length * (colW + gap) + 160)} ${height + 120}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="素早さグラフ">
       <style> text{font-family: "Noto Sans JP", sans-serif} </style>
-      <g transform="translate(40,0)">
+      <g transform="translate(20,0)">
         ${ticks.map((t,i)=>{
           const y = Math.round((height - 52) * (i/ (ticks.length-1))) + 12;
           return `<text x="-12" y="${y+5}" text-anchor="end" fill="${getComputedStyle(document.documentElement).getPropertyValue('--muted') || '#666'}">${t}</text>
-                  <line x1="0" y1="${y}" x2="${width-140}" y2="${y}" stroke="#f5f5f5" stroke-width="1" />`;
+                  <line x1="0" y1="${y}" x2="${Math.max(420, displayed.length * (colW + gap) + 100)}" y2="${y}" stroke="#f5f5f5" stroke-width="1" />`;
         }).join('')}
       </g>
       <g transform="translate(0,0)">${cols}</g>
@@ -629,9 +604,7 @@ function renderGraph(){
 }
 
 // events
-searchBox.addEventListener('input', (e)=> {
-  renderSuggestions(e.target.value);
-});
+searchBox.addEventListener('input', (e)=> renderSuggestions(e.target.value));
 searchBox.addEventListener('keydown', (e)=>{
   if(e.key === 'Enter'){
     const val = e.target.value.trim();
@@ -663,7 +636,7 @@ tabSettings.addEventListener('click', ()=>{
 
 // init
 loadCSV().then(()=> {
-  // optionally preload some pokemon for demo
+  // demo preload commented out
   // addPokemon('ピカチュウ'); addPokemon('ガブリアス');
 });
 </script>

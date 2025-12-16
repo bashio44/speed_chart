@@ -215,7 +215,7 @@ function iconUrlFromDex(dex){
   const n = String(dex).replace(/^0+/, '') || dex;
   let pad = n;
   if(/^\d+$/.test(n)) pad = n.padStart(3,'0');
-  return `https://zukan.pokemon.co.jp/zukan-api/up/images/index/${pad}_m.png`;
+  return `https://img.yakkun.com/poke/icon96/n${pad}.gif`;
 }
 
 function renderSuggestions(q){
